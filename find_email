@@ -1,0 +1,108 @@
+# Script:   find_email.py
+# Desc:     extracts email addresses and IP numbers from a text file
+#           or web page; for example, from a saved email header
+# Author:   Matt Muir November 2016
+# 
+#
+import sys, urllib, re
+        
+def wget(url): 
+    '''Function to open a URL, read contents and return as
+    web_contents variable then close.'''
+    webpage = urllib.urlopen(url)   # opens URL like a file
+    web_contents = webpage.read()   # reads contents
+    webpage.close()                 # closes URL
+    return web_contents             # returns web_contents variable for later use
+
+def txtget(filename):
+    '''Function to open a file in read mode, read contents into
+    file_contents variable and close.'''
+    text = open(filename, 'r')      # opens file in read mode
+    file_contents = text.read()     # reads contents
+    text.close()                    # closes file
+    return file_contents            # returns file_contents variable for later use
+
+def findIPv4(text):
+    '''Function to scrape IP addresses from websites or text files,
+    uses RegEx to locate groups of numbers in quad-dotted format
+    commonly seen in IP addresses.'''
+    ips = []                        # initialises ips variable
+    ips = re.findall(r'(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)', text)
+    # RegEx matches groups of numbers in IP format,
+    # found at: http://stackoverflow.com/questions/10086572/ip-address-validation-in-python-using-regex
+    return ips
+
+def findemail(text):
+    '''Function to scrape email addresses from websites or text files,
+    uses RegEx to locate groups of characters separated by dots and
+    @ symbol. The function also adds each instance of an email address
+    to a count so the number of occurrences can be printed later.'''
+    email_count = {}            # initialises email_count variable
+    for email in re.findall(r'[\w\.-]+@[\w\.-]+', text):
+    # RegEx scrapes strings in email address format    
+        if email not in email_count:
+            email_count[email] = 1
+        else:
+            email_count[email] += 1 # add 1 to count of email occurrences
+    return email_count              # returns email_count variable for later use
+
+def main():
+    # temp testing url argument
+    # un-comment one of the following 4 tests at a time
+    #sys.argv.append('http://www.napier.ac.uk/Pages/home.aspx')
+    sys.argv.append('http://asecuritysite.com/email01.txt')
+    #sys.argv.append('http://asecuritysite.com/email02.txt')
+    #sys.argv.append('email_sample.txt')
+    #sys.argv.append('http://www.soc.napier.ac.uk/~40001507/CSN08115/cw_webpage/index.html')
+
+    # malformed input tests
+    #sys.argv.append('.blahblah.')
+    #sys.argv.append('mydiary.txt')
+    #sys.argv.append('asdasdas')
+    #sys.argv.append('www.asd')
+    
+    #Check args
+    if len(sys.argv) !=2:
+        print '[-] Usage: email_analysis URL/filename'
+        return
+
+    # Get and analyse web page
+    try:
+        if "http://" in sys.argv[1]:       #if http occurs in argument
+            text = wget(sys.argv[1])    #use wget function
+        else:
+            text = txtget(sys.argv[1])  #use txtget function
+            
+        # Print output
+        print '[+] Analysing %s' % sys.argv[1]
+
+        print '\n[+] IP addresses found: \n' #print IP addresses on new line each time
+
+        if findIPv4(text):
+            for ip in findIPv4(text):
+                print ip, '\n'
+        else:
+            print 'No IPv4 addresses found!'
+            
+        print '\n[+] Email addresses found: \n' #print email addresses on new line each time
+
+        if findemail(text):
+            for i in findemail(text):
+                print '\n', 'Email Address: ', i,'- ' 'appears', findemail(text)[i], 'time(s)'
+        else:
+            print 'No Email addresses found!'
+
+       # Exception Handling
+    except:
+        if "http://" in sys.argv[1] or "www." in sys.argv[1]:
+            print "There's a problem with the test URL."
+        # if website-related error occures print appropriate error message
+        elif "txt" in sys.argv[1]:
+            print "File not found."
+        # if file-related error occures print appropriate error message
+        else:
+            print "Invalid input."
+        pass                               
+
+if __name__ == '__main__':
+	main()
