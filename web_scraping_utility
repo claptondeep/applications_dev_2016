@@ -1,0 +1,166 @@
+# Script:   getwebinfo.py
+# Desc:     HTML scraping tool that takes URL as input and outputs
+#           interesting data such as email addresses, MD5 hashes etc.
+#           Forensic analysis of any files found will also be performed
+#           including a hash comparison in order to identify files deemed
+#           as contraband.
+# Author:   Matt Muir November 2016
+# 
+#
+
+import sys, re, os, binascii, email_analysis, dict_crack, file_hash, urllib, webpage_getlinks
+
+
+def find_phone_number(webpage):
+    """Finds phone number in webpage using RegEx"""
+    numbers = []
+    # assign phone numbers to numbers variable using RegEx
+    numbers = re.findall('([+]?\d\d.\d.\d+(?:[- ]?)\d+(?:[- ]?)\d+)["?]', webpage)
+    return numbers  # return numbers for later use
+
+def find_hash_pass(webpage):
+    """Finds potential md5 password hashes in webpage using RegEx"""
+    md5Hashes = []
+    # assign md5 hashes to md5Hashes variable using RegEx
+    md5Hashes = re.findall('[a-fA-F\d]{32}', webpage)
+    return md5Hashes    # return numbers for later use
+
+def download_files(webpage):
+    """Downloads files of type jpg, gif, bmp and docx on webpage argument,
+        also uses RegEx"""
+    files = []
+    files = re.findall('[-\w]+\.(?:jpg|gif|bmp|docx)', webpage)
+    
+    # define top-level url for files to be located
+    url = "http://www.soc.napier.ac.uk/~40001507/CSN08115/cw_webpage/" 
+    url_list = []
+
+    # check to see if temp directory doesn't exist, if not then create directory
+    if not os.path.exists('~/Documents/temp'):
+            os.makedir('~/Documents/temp')
+
+    for each_file in files:
+        file_url = url+each_file # concatenate url and filename in file list
+        url_list.append(file_url)   # create url_list
+        for each_url in url_list:       # use url_list and urlretrieve to download files
+            dloaded_file = urllib.urlretrieve(each_url, "~/Documents/temp/" + each_file)                
+
+    return files
+    
+def hash_compare(temp_dir):
+    """Hashes downloaded files in temp directory and compares them to a list of known
+        bad file hashes"""
+    files = []
+    file_hashes = []
+
+    files = os.listdir(temp_dir) # assign directory listing to files variable
+
+
+    # create dictionary of bad hashes
+    hash_dict = {'9d377b10ce778c4938b3c7e2c63a229a': 'contraband_file1.jpg',
+                 '6bbaa34b19edd6c6fa06cccf29b33125': 'contraband_file2.jpg',
+                 'e4e7c3451a35944ca8697f9f2ac037f1': 'contraband_file3.jpg',
+                 '1d6d9c72e3476d336e657b50a77aee05': 'contraband_file4.gif'}
+
+    # create dictionary of file type hex signatures 
+
+    hexSig_dict = {'ffd8': '.jpg',
+                '4749': '.gif',
+                   '424d': '.bmp',
+                   '504b': '.docx'}
+
+    print '\n[+]Performing forensic analysis of downloaded files...'
+    
+    for each_file in files:
+        hashed_file = file_hash.get_hash(temp_dir+each_file)  # use get_hash to create hash of file
+        file_hashes.append(hashed_file) # append hashed_file to list of file_hashes
+        if hashed_file in hash_dict:       # check if hashed_file appears in bad hash dictionary 
+            print '\n[+]Illegal file identified: ', hash_dict[hashed_file], '\n[*]matches with downloaded file: ', each_file
+            open_file = open(temp_dir+each_file, 'r') # open illegal file by catting temp_dir and name of file
+            file_sig = open_file.read(2)        # read first 2 bytes of file
+            hex_sig = binascii.hexlify(file_sig)    # convert to hex signature
+            print '\n[*]Warning! Correct file extension should be: ', hexSig_dict[hex_sig]
+            
+    return file_hashes
+ 
+def main():
+
+    # temp testing URL argument
+    sys.argv.append('http://www.soc.napier.ac.uk/~40001507/CSN08115/cw_webpage/index.html')
+
+    # check args
+    if len(sys.argv) !=2:
+        print '[-] Usage: email_analysis URL/filename'
+        return
+
+    webpage = email_analysis.wget(sys.argv[1])
+
+    emails = [] # initialise email variable
+    emails = email_analysis.findemail(webpage)  # set email variable to value of findemail
+                                                # with webpage contents as argument
+    
+    ip_addresses = email_analysis.findIPv4(webpage) 
+    hyperlinks = webpage_getlinks.get_links(webpage)
+    temp_dir = "~/Documents/temp/" # create temp_dir variable so it can be passed to functions
+                                         
+# try:
+
+    # Print Statements:
+    
+    print '[+] Analysing %s' % sys.argv[1]
+    
+    print '\n[+] Email addresses found: \n' #print email addresses on new line each time 
+    if email_analysis.findemail(webpage):
+        for i in emails:
+            print 'Email Address: ', i,'- ' 'appears', emails[i], 'time(s)'
+    else:
+        print 'No email addresses found!'        
+     
+    print '\n[+] IP addresses found: \n'
+    if email_analysis.findIPv4(webpage):
+        for ip in ip_addresses:
+            print ip, '\n'
+    else:
+        print 'No IPv4 addresses found!'
+
+    print '\n[+] Hyperlinks found: \n'
+    if webpage_getlinks.get_links(webpage):
+        for link in hyperlinks:
+            print 'Hyperlink: ', link
+        print 'Total: ', hyperlinks[link]
+    else:
+        print 'No hyperlinks found!'
+
+    print '\n[+] Phone numbers found: \n'
+    if find_phone_number(webpage):
+        for i in find_phone_number(webpage):
+            print i   
+    else:
+        print 'No phone numbers found!'
+
+    print '\n[+] Potential MD5 hashed passwords found: \n'
+    if find_hash_pass(webpage):
+        for md5Hash in find_hash_pass(webpage):
+            print 'hash value in hex: ', md5Hash
+    else:
+        print 'No MD5 hashes found!'
+
+    print '\n[+]Attempting to crack hashed passwords... \n'
+    for md5Hash in find_hash_pass(webpage):
+        dict_crack.dict_attack(md5Hash)
+
+    print '\n[+]Scraping page for files... (may take a while) \n'
+    if download_files(webpage):
+        for files in download_files(webpage):
+            print 'File downloaded at link:  ', "http://www.soc.napier.ac.uk/~40001507/CSN08115/cw_webpage/" + files 
+
+    print "\n[*]All downloaded files saved in ", temp_dir
+
+    # send temp_dir variable to hash_compare function
+    hash_compare(temp_dir) 
+    
+ # except IOError:
+         # print 'Malformed input detected'
+    
+if __name__ == '__main__':
+	main()
