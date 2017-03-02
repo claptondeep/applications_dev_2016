@@ -1,0 +1,46 @@
+# Script: file_hash.py
+# Desc:   Generate file hash signature
+# Author: Matt Muir
+# 
+
+import sys, os
+import hashlib
+
+def get_hash(filename):
+    try:
+        f = open(filename)                          # open file 
+        file_content = f.read()                     # read file contents to 
+                                                    # file_content variable                         
+        file_hashsig = hashlib.md5(file_content)    # create md5 hash sig
+        hexSig = file_hashsig.hexdigest()           # assign hex of sig to hexSig
+        return hexSig 
+    except Exception as err:
+        print '[-]', str(err)                       # exception handling
+
+    finally:
+        if 'f' in locals():                         # close file 
+            f.close()
+
+
+                                      # return hexSig variable
+              
+    
+    
+def main():
+
+
+##    os.chdir('/Users/matthewmuir/Documents/temp/')
+    #sys.argv.append('/Users/matthewmuir/Documents/temp/monty-python.bmp')
+    filename = sys.argv[1]                          # filename = argument
+    get_hash(filename)                              # send filename to get_hash
+
+    # check arg length
+    if len(sys.argv) != 2:
+        print '[-] usage: file_hash filename'
+        sys.exit(1)
+
+    print '[+] Hashing... file:', filename, ' hash_sig:', get_hash(filename)
+  
+
+if __name__ == '__main__':
+	main()
